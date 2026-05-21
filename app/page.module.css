@@ -272,28 +272,41 @@
 /* Cell state modifiers */
 .cellShip {
   background-color: var(--state-ship) !important;
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 .cellHit {
-  background-color: #fee2e2;
-  color: var(--state-hit);
-  font-size: 0.9rem;
-  font-weight: 800;
+  background-color: var(--state-hit) !important;
+  color: #ffffff !important;
+  font-size: 1rem;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .cellSunk {
-  background-color: #fecaca;
-  color: var(--state-sunk);
-  font-size: 0.9rem;
+  background-color: var(--state-sunk) !important;
+  color: #ffffff !important;
+  font-size: 1rem;
   font-weight: 900;
-  border: 1px solid var(--state-sunk);
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
 }
 
 .cellMiss {
-  background-color: #f1f5f9;
-  color: var(--state-miss);
+  background-color: var(--state-miss) !important;
+  color: #ffffff !important;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.cellFiring {
+  background-color: var(--state-firing) !important;
+  color: #ffffff !important;
   font-size: 1.1rem;
+  font-weight: bold;
+  animation: sonar-pulse 1s infinite ease-in-out;
+  cursor: not-allowed;
 }
 
 .cellPlacementHover {

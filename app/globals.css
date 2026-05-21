@@ -11,13 +11,14 @@
   --navy-light: #eff6ff;        /* Soft navy hover tint */
   --border-slate: #cbd5e1;      /* Clean blueprint divider slate */
   
-  /* Game cell states (clean and non-stylized) */
+  /* Game cell states (high-contrast tactical color scheme) */
   --state-empty: #f8fafc;
-  --state-ship: #0d9488;        /* Professional tactical Teal for ships */
-  --state-hit: #dc2626;         /* Clear Coral/Crimson Red for direct hits */
-  --state-miss: #94a3b8;        /* Soft Blue-Slate for misses/water splashes */
-  --state-sunk: #7f1d1d;        /* Deep Crimson for completely sunk ships */
+  --state-ship: #2563eb;        /* Solid High-Contrast Blue for player ships */
+  --state-hit: #dc2626;         /* Vivid Signal Red for successful hits */
+  --state-miss: #475569;        /* Matte Dark Grey for missed target zones */
+  --state-sunk: #7f1d1d;        /* Heavy Maroon Red for destroyed ships */
   --state-hover: #38bdf8;       /* Clean Sky Blue for active placement preview */
+  --state-firing: #f59e0b;      /* High-visibility Warning Amber for active scan/fire */
   
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
@@ -84,4 +85,10 @@ body {
 
 .ripple-miss-anim {
   animation: ripple-miss 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes sonar-pulse {
+  0% { transform: scale(0.9); opacity: 0.75; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  70% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.9); opacity: 0.75; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
 }

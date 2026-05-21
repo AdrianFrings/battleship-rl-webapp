@@ -71,10 +71,19 @@ export default function GameBoard({
       const cellData = board ? board[r][c] : 'NONE:EMPTY';
       const [shipType, state] = cellData.split(':');
       
-      let cellClass = `${styles.cell} ${styles.cellPlayable}`;
+      let cellClass = `${styles.cell}`;
       let content = '';
 
-      if (state === 'HIT') {
+      if (state === 'EMPTY') {
+        cellClass += ` ${styles.cellPlayable}`;
+        if (shipType !== 'NONE') {
+          cellClass += ` ${styles.cellShip}`;
+          // Only show ship letters on your own board, not in enemy fog-of-war
+          if (prefix === 'p') {
+            content = shipType.charAt(0);
+          }
+        }
+      } else if (state === 'HIT') {
         cellClass += ` ${styles.cellHit}`;
         content = '✕';
         if (sunkShips.has(shipType)) {
@@ -83,14 +92,9 @@ export default function GameBoard({
       } else if (state === 'MISS') {
         cellClass += ` ${styles.cellMiss}`;
         content = '•';
-      } else if (state === 'EMPTY') {
-        if (shipType !== 'NONE') {
-          cellClass += ` ${styles.cellShip}`;
-          // Only show ship letters on your own board, not in enemy fog-of-war
-          if (prefix === 'p') {
-            content = shipType.charAt(0);
-          }
-        }
+      } else if (state === 'FIRING') {
+        cellClass += ` ${styles.cellFiring}`;
+        content = '◎';
       }
 
       // Overlap placement hover if manual ship placing is active
@@ -110,7 +114,9 @@ export default function GameBoard({
               e.preventDefault(); // allow right-click rotation without browser menus
             }
           }}
-        />
+        >
+          {content}
+        </div>
       );
     }
   }

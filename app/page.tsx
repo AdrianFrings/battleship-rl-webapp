@@ -51,6 +51,14 @@ export default function Home() {
   const [placementHoverCells, setPlacementHoverCells] = useState<{ r: number; c: number }[]>([]);
   const lastPlacementRef = useRef<{ r: number; c: number; dir: 'right' | 'down'; size: number } | null>(null);
 
+  // Create refs to avoid stale closures in WebSocket event listeners
+  const yourBoardRef = useRef<string[][] | null>(null);
+  yourBoardRef.current = yourBoard;
+  const placingShipRef = useRef<string | null>(null);
+  placingShipRef.current = placingShip;
+  const enemyBoardRef = useRef<string[][] | null>(null);
+  enemyBoardRef.current = enemyBoard;
+
   // End game stats
   const [winner, setWinner] = useState<string | null>(null);
   const [totalTurns, setTotalTurns] = useState(0);
@@ -186,18 +194,19 @@ export default function Home() {
 
         case "placement_ack":
           if (msg.valid) {
-            addLog(`Deplaced ship: ${placingShip}`, "info", "player");
+            const currentShip = placingShipRef.current || 'ship';
+            addLog(`Deployed ship: ${currentShip}`, "info", "player");
             
             // Color ship locally for feedback before game_start
-            if (lastPlacementRef.current && yourBoard) {
+            const currentBoard = yourBoardRef.current;
+            if (lastPlacementRef.current && currentBoard) {
               const { r, c, dir, size } = lastPlacementRef.current;
-              const updatedBoard = [...yourBoard];
+              const updatedBoard = currentBoard.map(row => [...row]); // Deep copy of rows
               for (let i = 0; i < size; i++) {
                 const row = dir === 'down' ? r + i : r;
                 const col = dir === 'right' ? c + i : c;
                 if (row < 10 && col < 10) {
-                  const [ship, state] = updatedBoard[row][col].split(':');
-                  updatedBoard[row][col] = `${placingShip}:EMPTY`;
+                  updatedBoard[row][col] = `${currentShip}:EMPTY`;
                 }
               }
               setYourBoard(updatedBoard);
@@ -328,6 +337,7 @@ export default function Home() {
       setIsWsConnected(false);
       setIsLoading(false);
       addLog("Disconnected from operational grid.", "hit", "player");
+      setErrorMessage("Disconnected from operational grid. The connection to the Battleship RL server was closed.");
     };
 
     ws.onerror = (error) => {
@@ -342,6 +352,33 @@ export default function Home() {
     if (!myTurn || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
+
+    const rowChar = coordinate.charAt(0);
+    const colStr = coordinate.substring(1);
+    const r = ROWS.indexOf(rowChar);
+    const c = parseInt(colStr, 10) - 1;
+
+    const currentEnemyBoard = enemyBoardRef.current;
+    if (currentEnemyBoard && currentEnemyBoard[r] && currentEnemyBoard[r][c]) {
+      const [ship, state] = currentEnemyBoard[r][c].split(':');
+      if (state !== 'EMPTY') {
+        // Cell already targeted, ignore click
+        return;
+      }
+    }
+
+    // Set firing visual feedback immediately
+    if (currentEnemyBoard) {
+      const updatedEnemy = currentEnemyBoard.map((row, ri) =>
+        row.map((cell, ci) => (ri === r && ci === c ? 'NONE:FIRING' : cell))
+      );
+      setEnemyBoard(updatedEnemy);
+    }
+
+    // Lock board immediately by setting myTurn to false to prevent multiple firing clicks
+    setMyTurn(false);
+
+    // Send targeted coordinate to operational server
     socketRef.current.send(JSON.stringify({ type: "move", coordinate }));
   };
 
