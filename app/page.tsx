@@ -292,6 +292,7 @@ export default function Home() {
                 }
               }
               setYourBoard(updatedBoard);
+              yourBoardRef.current = updatedBoard; // Sync ref immediately
             }
             
             setPlacingShip(null);
@@ -310,9 +311,12 @@ export default function Home() {
           addLog("AI opponent fleet deployed in fog of war.", "info", "agent");
           if (msg.your_board) {
             setYourBoard(msg.your_board);
+            yourBoardRef.current = msg.your_board; // Sync ref immediately
           }
           // Initialize empty enemy board
-          setEnemyBoard(Array(10).fill(null).map(() => Array(10).fill('NONE:EMPTY')));
+          const initialEnemyBoard = Array(10).fill(null).map(() => Array(10).fill('NONE:EMPTY'));
+          setEnemyBoard(initialEnemyBoard);
+          enemyBoardRef.current = initialEnemyBoard; // Sync ref immediately
           break;
 
         case "player_view":
@@ -320,8 +324,15 @@ export default function Home() {
           setGameState('active');
           setMyTurn(true);
           setTurnCount(msg.turn);
-          if (msg.enemy_board) setEnemyBoard(msg.enemy_board);
-          if (msg.your_board) setYourBoard(msg.your_board);
+          turnCountRef.current = msg.turn; // Sync ref immediately
+          if (msg.enemy_board) {
+            setEnemyBoard(msg.enemy_board);
+            enemyBoardRef.current = msg.enemy_board; // Sync ref immediately
+          }
+          if (msg.your_board) {
+            setYourBoard(msg.your_board);
+            yourBoardRef.current = msg.your_board; // Sync ref immediately
+          }
           if (msg.ships_sunk) {
             setPlayerScore(prev => ({ ...prev, sunk: msg.ships_sunk.by_you }));
             setAgentScore(prev => ({ ...prev, sunk: msg.ships_sunk.against_you }));
@@ -342,6 +353,15 @@ export default function Home() {
           
           addLog(logTxt, typeVal, "player");
           setMyTurn(false);
+
+          // Preemptively check if the move resulted in game over
+          if (msg.game_over === true) {
+            gameStateRef.current = 'game_over';
+            setGameState('game_over');
+            setWinner('player');
+            setTotalTurns(turnCountRef.current + 1);
+            registerHighscore(turnCountRef.current + 1);
+          }
           break;
 
         case "ship_sunk":
@@ -369,6 +389,7 @@ export default function Home() {
         case "game_state":
           if (msg.player_board) {
             setYourBoard(msg.player_board.cells);
+            yourBoardRef.current = msg.player_board.cells; // Sync ref immediately
             setAgentScore({
               sunk: msg.player_board.ships_sunk,
               hit: msg.player_board.cells_hit
@@ -376,10 +397,15 @@ export default function Home() {
           }
           if (msg.agent_board) {
             setEnemyBoard(msg.agent_board.cells);
+            enemyBoardRef.current = msg.agent_board.cells; // Sync ref immediately
             setPlayerScore({
               sunk: msg.agent_board.ships_sunk,
               hit: msg.agent_board.cells_hit
             });
+          }
+          if (msg.turn !== undefined) {
+            setTurnCount(msg.turn);
+            turnCountRef.current = msg.turn; // Sync ref immediately
           }
 
           // Opponent logs
@@ -399,6 +425,17 @@ export default function Home() {
             addLog(aLog, aType, "agent");
             if (hitAgent) {
               triggerScreenShake();
+            }
+          }
+
+          // Preemptively check if game is over via state update
+          if (msg.game_over === true) {
+            gameStateRef.current = 'game_over';
+            setGameState('game_over');
+            setWinner(msg.winner || 'agent');
+            setTotalTurns(msg.turn || turnCountRef.current);
+            if (msg.winner === 'player') {
+              registerHighscore(msg.turn || turnCountRef.current);
             }
           }
           break;
