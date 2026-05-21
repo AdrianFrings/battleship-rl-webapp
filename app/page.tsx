@@ -354,13 +354,54 @@ export default function Home() {
           addLog(logTxt, typeVal, "player");
           setMyTurn(false);
 
+          // Update local enemy board grid immediately to prevent stale scan on websocket close
+          const rChar = msg.coordinate.charAt(0);
+          const cStr = msg.coordinate.substring(1);
+          const ri = ROWS.indexOf(rChar);
+          const ci = parseInt(cStr, 10) - 1;
+
+          if (enemyBoardRef.current && ri !== -1 && ci >= 0 && ci < 10) {
+            const shipName = msg.ship_hit || msg.ship_sunk || 'NONE';
+            const updated = enemyBoardRef.current.map((row, rIdx) =>
+              row.map((cell, cIdx) => {
+                if (rIdx === ri && cIdx === ci) {
+                  return `${shipName}:${msg.result === 'HIT' ? 'HIT' : 'MISS'}`;
+                }
+                return cell;
+              })
+            );
+            setEnemyBoard(updated);
+            enemyBoardRef.current = updated;
+          }
+
+          // Preemptively update score/hits count
+          if (hitSuccess) {
+            setPlayerScore(prev => ({
+              ...prev,
+              hit: prev.hit + 1,
+              sunk: msg.ship_sunk ? prev.sunk + 1 : prev.sunk
+            }));
+          }
+
+          // Preemptively update sunkShips list
+          if (msg.ship_sunk) {
+            setSunkShips(prev => {
+              const updated = new Set(prev.a);
+              updated.add(msg.ship_sunk);
+              return {
+                ...prev,
+                a: updated,
+              };
+            });
+          }
+
           // Preemptively check if the move resulted in game over
           if (msg.game_over === true) {
             gameStateRef.current = 'game_over';
             setGameState('game_over');
             setWinner('player');
-            setTotalTurns(turnCountRef.current + 1);
-            registerHighscore(turnCountRef.current + 1);
+            setTotalTurns(turnCountRef.current);
+            registerHighscore(turnCountRef.current);
           }
           break;
 
