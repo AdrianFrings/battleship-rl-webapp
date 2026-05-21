@@ -18,7 +18,7 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
   const [apiUrl, setApiUrl] = useState('http://localhost:8080');
   const [agent, setAgent] = useState('q-agent');
   const [placementMode, setPlacementMode] = useState('manual');
-  const [placementMethod, setPlacementMethod] = useState('cognitive_human');
+  const [placementMethod, setPlacementMethod] = useState('random');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +77,6 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               value={placementMethod}
               onChange={(e) => setPlacementMethod(e.target.value)}
             >
-              <option value="cognitive_human">Cognitive Human-Like Prior</option>
               <option value="random">Pure Random Fleet</option>
               <option value="dense_center">Dense Center Bias</option>
               <option value="edges">Perimeter Edge Bias</option>
@@ -85,6 +84,8 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <option value="spread">Hyper-Dispersion (Spread)</option>
               <option value="clustered">Tightly Clustered</option>
               <option value="diagonal">Main Diagonal Alignment</option>
+              <option value="gaussian">Gaussian Distribution Bias</option>
+              <option value="quadrant">Quadrant Bias</option>
             </select>
           </div>
 
