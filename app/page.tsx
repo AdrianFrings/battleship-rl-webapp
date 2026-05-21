@@ -102,6 +102,8 @@ export default function Home() {
   placingShipRef.current = placingShip;
   const enemyBoardRef = useRef<string[][] | null>(null);
   enemyBoardRef.current = enemyBoard;
+  const turnCountRef = useRef(turnCount);
+  turnCountRef.current = turnCount;
 
   // End game stats
   const [winner, setWinner] = useState<string | null>(null);
@@ -138,6 +140,36 @@ export default function Home() {
       setPlayerLogs(prev => [newEntry, ...prev.slice(0, 19)]);
     } else {
       setAgentLogs(prev => [newEntry, ...prev.slice(0, 19)]);
+    }
+  };
+
+  const registerHighscore = (turns: number) => {
+    try {
+      const key = 'battleship_highscores';
+      const stored = localStorage.getItem(key);
+      const records = stored ? JSON.parse(stored) : [];
+      
+      // Check if this record already exists (avoid duplicates in case both callbacks fire)
+      const isDuplicate = records.some((r: any) => 
+        r.name === (nicknameRef.current || 'Commander') && 
+        r.turns === turns && 
+        r.agent === (opponentAgentRef.current || 'q-agent') &&
+        Math.abs(new Date(r.date).getTime() - new Date().getTime()) < 5000 // within 5 seconds
+      );
+      if (isDuplicate) return;
+
+      records.push({
+        name: nicknameRef.current || 'Commander',
+        turns: turns,
+        agent: opponentAgentRef.current || 'q-agent',
+        date: new Date().toLocaleDateString(),
+      });
+      // Sort ascending by turns (fewer turns is better)
+      records.sort((a: any, b: any) => a.turns - b.turns);
+      // Save only top 25 records
+      localStorage.setItem(key, JSON.stringify(records.slice(0, 25)));
+    } catch (e) {
+      console.error("Failed to register combat record highscore", e);
     }
   };
 
@@ -388,23 +420,7 @@ export default function Home() {
           }
           // Register highscore in localStorage if player wins!
           if (msg.winner === "player") {
-            try {
-              const key = 'battleship_highscores';
-              const stored = localStorage.getItem(key);
-              const records = stored ? JSON.parse(stored) : [];
-              records.push({
-                name: nicknameRef.current || 'Commander',
-                turns: msg.total_turns,
-                agent: opponentAgentRef.current || 'q-agent',
-                date: new Date().toLocaleDateString(),
-              });
-              // Sort ascending by turns (fewer turns is better)
-              records.sort((a: any, b: any) => a.turns - b.turns);
-              // Save only top 25 records
-              localStorage.setItem(key, JSON.stringify(records.slice(0, 25)));
-            } catch (e) {
-              console.error("Failed to register combat record highscore", e);
-            }
+            registerHighscore(msg.total_turns);
           }
           break;
       }
@@ -414,7 +430,22 @@ export default function Home() {
       setIsWsConnected(false);
       setIsLoading(false);
       addLog("Disconnected from operational grid.", "hit", "player");
-      if (gameStateRef.current !== 'game_over') {
+      
+      // Auto-detect game over as a robust client-side fallback
+      const derivedYourSunk = getSunkShipsFromBoard(yourBoardRef.current);
+      const derivedEnemySunk = getSunkShipsFromBoard(enemyBoardRef.current);
+      
+      if (derivedYourSunk.size === 5 || derivedEnemySunk.size === 5) {
+        gameStateRef.current = 'game_over';
+        setGameState('game_over');
+        const finalWinner = derivedEnemySunk.size === 5 ? 'player' : 'agent';
+        setWinner(finalWinner);
+        setTotalTurns(turnCountRef.current);
+        
+        if (finalWinner === 'player') {
+          registerHighscore(turnCountRef.current);
+        }
+      } else if (gameStateRef.current !== 'game_over') {
         setErrorMessage("Disconnected from operational grid. The connection to the Battleship RL server was closed.");
       }
     };
