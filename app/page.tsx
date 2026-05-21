@@ -48,7 +48,7 @@ const getSunkShipsFromBoard = (board: string[][] | null): Set<string> => {
 export default function Home() {
   // Game state
   const [gameState, setGameState] = useState<'setup' | 'placement' | 'active' | 'game_over'>('setup');
-  const [apiUrl, setApiUrl] = useState('http://localhost:8080');
+  const [apiUrl, setApiUrl] = useState('https://battleship-rl-2fw3ot52dq-uc.a.run.app');
   const [gameId, setGameId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

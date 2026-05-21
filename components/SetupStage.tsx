@@ -30,7 +30,7 @@ const AGENT_LABELS: Record<string, string> = {
 };
 
 export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
-  const [apiUrl, setApiUrl] = useState('http://localhost:8080');
+  const [apiUrl, setApiUrl] = useState('https://battleship-rl-2fw3ot52dq-uc.a.run.app');
   const [agent, setAgent] = useState('q-agent');
   const [placementMode, setPlacementMode] = useState('manual');
   const [nickname, setNickname] = useState('');
@@ -63,12 +63,7 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
     });
   };
 
-  const handleClearLeaderboard = () => {
-    if (confirm('Clear highscores? This action is permanent.')) {
-      localStorage.removeItem('battleship_highscores');
-      setLeaderboard([]);
-    }
-  };
+
 
   return (
     <div className={styles.setupContainer}>
@@ -145,22 +140,7 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               </div>
             </div>
 
-            {/* FastAPI Backend Server URL */}
-            <div className={styles.formGroup}>
-              <label htmlFor="apiUrl" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <HelpCircle size={12} /> Operational API Gateway
-              </label>
-              <input
-                id="apiUrl"
-                type="text"
-                className={styles.input}
-                style={{ fontSize: '0.8rem' }}
-                value={apiUrl}
-                onChange={(e) => setApiUrl(e.target.value)}
-                placeholder="e.g., http://localhost:8080"
-                required
-              />
-            </div>
+
 
             <button
               type="submit"
@@ -258,14 +238,6 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <Trophy size={20} style={{ color: '#eab308' }} />
               Combat Records (Leaderboard)
             </span>
-            {leaderboard.length > 0 && (
-              <button 
-                onClick={handleClearLeaderboard}
-                style={{ fontSize: '0.65rem', background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 700 }}
-              >
-                Clear Records
-              </button>
-            )}
           </h3>
 
           {leaderboard.length === 0 ? (
