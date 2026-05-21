@@ -1,47 +1,41 @@
-# Battleship RL Command Center Webapp (`battleship-rl-webapp`)
+# Battleship RL - Command Center Webapp
 
-This is a crisp, responsive, high-fidelity Next.js web application designed to connect to the containerized Battleship Reinforcement Learning game backend. Play Battleship in real-time against state-of-the-art Deep Q-Learning (`q-agent`) and Bayesian Probability agents.
+This repository contains the interactive, responsive React/Next.js front-end web application for the Battleship Reinforcement Learning project. 
 
-Built with a **Clean Tactical Ocean / Blueprint Theme** utilizing standard Next.js, React Hooks, and CSS modules. Optimized for seamless, native deployment on **Vercel**.
-
----
-
-## Visual Design & User Experience
-- **Tactical Blueprint Theme**: A clean maritime radar blueprint aesthetic with primary deep navy accents, slate gray grids, coral red indicators for hits, and seafoam details for ships.
-- **Manual Fleet Placement**: Intuitive click-to-deploy placement mechanism. Hover grid cells to visualize ship lengths, press `R` or right-click to rotate, and click to deploy.
-- **Interactive Battle Boards**: Tracks hit and miss indicators (`✕` and `•`), handles screen shakes on successful hit impacts, and provides live operational log columns.
-- **Dynamic Accuracy Statistics**: Shows progress bars for fleet health/integrity alongside total direct hits.
+It provides a premium, clean navy tactical interface allowing players to deploy their fleets manually and play Battleship in real-time against state-of-the-art AI agents (including Deep Q-Learning DQN and Bayesian models) over secure WebSockets.
 
 ---
 
-## Local Development
+## 🔗 Main Project Repository
 
-### 1. Prerequsite: Run the Backend
-Ensure the FastAPI game server is running locally (e.g., from the `containerization` branch of `battleship_rl` on port `8888` or `8080`):
-```bash
-conda activate battleship-rl
-pip install fastapi uvicorn[standard]
-uvicorn server:app --reload --port 8080
-```
+The core game logic, agent training pipelines, cognitive human-like placement heuristics, and containerized FastAPI backend are hosted in the primary repository:
 
-### 2. Run the Webapp
-Install npm packages and launch the Next.js development server:
-```bash
-npm install
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser. Configure the Setup input box to connect to your backend URL (`http://localhost:8080`).
+👉 **[battleship_rl (Core Agent & Environment Repo)](https://github.com/HumbleHominid/battleship_rl)**
+
+Please refer to the main repository for:
+* **Reinforcement Learning Models**: DQN architectures, reward function configurations, and training pipelines.
+* **FastAPI Backend Server**: The containerized game runner that exposes WebSockets for real-time play.
+* **Simulation & Analysis**: Heatmaps and training convergence analysis for tactical agents.
+
+---
+
+## Local Development Quickstart
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+2. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Input your active running backend server URL (e.g. `http://localhost:8080`) in the *Operational API Gateway* input inside the control room to launch your game session.
 
 ---
 
 ## Vercel Deployment
 
-This project is fully ready for a 1-click zero-config deployment on Vercel:
-
-1. **Push to GitHub**: Push this repository to your GitHub account under `battleship-rl-webapp`.
-2. **Import to Vercel**: Connect your Vercel account to GitHub and import the `battleship-rl-webapp` repository.
-3. **Environment Variables**: (Optional) Add `NEXT_PUBLIC_API_URL` pointing to your FastAPI backend hosted on GCP Cloud Run.
-4. **Deploy**: Click Deploy. Vercel will automatically compile, optimize, and serve your app globally.
-
-### Secure WebSockets (WS vs WSS)
-Since Vercel serves the webapp over HTTPS, modern browsers enforce secure WebSocket connections (`wss://`). The state engine of this application automatically handles mapping `https://` backend endpoints to secure `wss://` WebSockets, ensuring seamless out-of-the-box compatibility.
+This web application is optimized for native, zero-config deployment on Vercel:
+1. Import this repository into Vercel.
+2. Deploy! The front-end automatically upgrades your HTTP connection to Secure WebSockets (`wss://`) when pointing to production cloud APIs (e.g. FastAPI on GCP Cloud Run).
