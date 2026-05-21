@@ -9,10 +9,41 @@ import PlacementStage from '../components/PlacementStage';
 import GameBoard from '../components/GameBoard';
 import StatsPanel from '../components/StatsPanel';
 import GameLogs, { LogEntry } from '../components/GameLogs';
-import { Shield, RefreshCw, AlertCircle } from 'lucide-react';
+import { Shield, RefreshCw, AlertCircle, Home as HomeIcon } from 'lucide-react';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 const COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+const getSunkShipsFromBoard = (board: string[][] | null): Set<string> => {
+  const sunk = new Set<string>();
+  if (!board) return sunk;
+  
+  const hits: Record<string, number> = {
+    CARRIER: 0,
+    BATTLESHIP: 0,
+    DESTROYER: 0,
+    SUBMARINE: 0,
+    PATROL_BOAT: 0,
+  };
+
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      const cellData = board[r][c] || 'NONE:EMPTY';
+      const [shipType, state] = cellData.split(':');
+      if (state === 'HIT' && shipType in hits) {
+        hits[shipType]++;
+      }
+    }
+  }
+
+  if (hits.CARRIER === 5) sunk.add('CARRIER');
+  if (hits.BATTLESHIP === 4) sunk.add('BATTLESHIP');
+  if (hits.DESTROYER === 3) sunk.add('DESTROYER');
+  if (hits.SUBMARINE === 3) sunk.add('SUBMARINE');
+  if (hits.PATROL_BOAT === 2) sunk.add('PATROL_BOAT');
+
+  return sunk;
+};
 
 export default function Home() {
   // Game state
@@ -50,6 +81,19 @@ export default function Home() {
   const [placeDirection, setPlaceDirection] = useState<'right' | 'down'>('right');
   const [placementHoverCells, setPlacementHoverCells] = useState<{ r: number; c: number }[]>([]);
   const lastPlacementRef = useRef<{ r: number; c: number; dir: 'right' | 'down'; size: number } | null>(null);
+
+  // Player callsign and Opponent tracking
+  const [nickname, setNickname] = useState('');
+  const nicknameRef = useRef(nickname);
+  nicknameRef.current = nickname;
+
+  const [opponentAgent, setOpponentAgent] = useState('q-agent');
+  const opponentAgentRef = useRef(opponentAgent);
+  opponentAgentRef.current = opponentAgent;
+
+  // GameState ref to avoid stale closures in WS close handler
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
 
   // Create refs to avoid stale closures in WebSocket event listeners
   const yourBoardRef = useRef<string[][] | null>(null);
@@ -102,6 +146,7 @@ export default function Home() {
     if (socketRef.current) {
       socketRef.current.close();
     }
+    gameStateRef.current = 'setup';
     setGameState('setup');
     setGameId(null);
     setYourBoard(null);
@@ -129,10 +174,13 @@ export default function Home() {
     agent: string;
     placementMode: string;
     placementMethod: string;
+    nickname: string;
   }) => {
     setIsLoading(true);
     setErrorMessage(null);
     setApiUrl(config.apiUrl);
+    setNickname(config.nickname);
+    setOpponentAgent(config.agent);
 
     try {
       const response = await fetch(`${config.apiUrl}/games`, {
@@ -183,9 +231,11 @@ export default function Home() {
       switch (msg.type) {
         case "welcome":
           addLog("Connected to tactical battle server.", "info", "player");
+          addLog("AI Opponent online & scanning.", "info", "agent");
           break;
 
         case "place_ship":
+          gameStateRef.current = 'placement';
           setGameState('placement');
           setPlacingShip(msg.ship);
           setPlacingSize(msg.size);
@@ -222,8 +272,10 @@ export default function Home() {
 
         case "game_start":
           setPlacingShip(null);
+          gameStateRef.current = 'active';
           setGameState('active');
           addLog("All battle fleets deployed! Mission active.", "info", "player");
+          addLog("AI opponent fleet deployed in fog of war.", "info", "agent");
           if (msg.your_board) {
             setYourBoard(msg.your_board);
           }
@@ -232,6 +284,7 @@ export default function Home() {
           break;
 
         case "player_view":
+          gameStateRef.current = 'active';
           setGameState('active');
           setMyTurn(true);
           setTurnCount(msg.turn);
@@ -275,6 +328,9 @@ export default function Home() {
           const targetLabel = isPlayer ? "enemy's" : "your";
           const subjectLabel = isPlayer ? "You" : "AI opponent";
           triggerToast(`💥 ${subjectLabel} sunk ${targetLabel} ${msg.ship}!`);
+          if (!isPlayer) {
+            addLog(`CRITICAL: AI sunk your ${msg.ship}!`, "sunk", "agent");
+          }
           triggerScreenShake();
           break;
 
@@ -316,6 +372,7 @@ export default function Home() {
           break;
 
         case "game_over":
+          gameStateRef.current = 'game_over';
           setGameState('game_over');
           setWinner(msg.winner);
           setTotalTurns(msg.total_turns);
@@ -329,6 +386,26 @@ export default function Home() {
               hit: msg.scores.agent.cells_hit
             });
           }
+          // Register highscore in localStorage if player wins!
+          if (msg.winner === "player") {
+            try {
+              const key = 'battleship_highscores';
+              const stored = localStorage.getItem(key);
+              const records = stored ? JSON.parse(stored) : [];
+              records.push({
+                name: nicknameRef.current || 'Commander',
+                turns: msg.total_turns,
+                agent: opponentAgentRef.current || 'q-agent',
+                date: new Date().toLocaleDateString(),
+              });
+              // Sort ascending by turns (fewer turns is better)
+              records.sort((a: any, b: any) => a.turns - b.turns);
+              // Save only top 25 records
+              localStorage.setItem(key, JSON.stringify(records.slice(0, 25)));
+            } catch (e) {
+              console.error("Failed to register combat record highscore", e);
+            }
+          }
           break;
       }
     };
@@ -337,7 +414,9 @@ export default function Home() {
       setIsWsConnected(false);
       setIsLoading(false);
       addLog("Disconnected from operational grid.", "hit", "player");
-      setErrorMessage("Disconnected from operational grid. The connection to the Battleship RL server was closed.");
+      if (gameStateRef.current !== 'game_over') {
+        setErrorMessage("Disconnected from operational grid. The connection to the Battleship RL server was closed.");
+      }
     };
 
     ws.onerror = (error) => {
@@ -440,6 +519,15 @@ export default function Home() {
     }
   }, [gameState, yourBoard]);
 
+  // Derived sets of sunk ships to ensure UI consistency
+  const derivedYourSunk = getSunkShipsFromBoard(yourBoard);
+  const derivedEnemySunk = getSunkShipsFromBoard(enemyBoard);
+
+  const mergedSunkShips = {
+    p: new Set([...Array.from(sunkShips.p), ...Array.from(derivedYourSunk)]),
+    a: new Set([...Array.from(sunkShips.a), ...Array.from(derivedEnemySunk)]),
+  };
+
   return (
     <div className={`${styles.container} ${isShaking ? 'shake' : ''}`}>
       {/* Title Header */}
@@ -518,11 +606,11 @@ export default function Home() {
                 <GameBoard
                   board={yourBoard}
                   prefix="p"
-                  onPlayerCellClick={handlePlayerCellClick}
+                  onPlayerCellClick={gameState === 'placement' ? handlePlayerCellClick : undefined}
                   placementHoverCells={placementHoverCells}
                   onMouseEnterCell={handleMouseEnterCell}
                   onMouseLeaveCell={handleMouseLeaveCell}
-                  sunkShips={sunkShips.p}
+                  sunkShips={mergedSunkShips.p}
                 />
               </div>
 
@@ -536,8 +624,8 @@ export default function Home() {
                 <GameBoard
                   board={enemyBoard}
                   prefix="a"
-                  onCellClick={handleCellClick}
-                  sunkShips={sunkShips.a}
+                  onCellClick={myTurn ? handleCellClick : undefined}
+                  sunkShips={mergedSunkShips.a}
                 />
               </div>
 
@@ -558,6 +646,7 @@ export default function Home() {
             <StatsPanel 
               playerScore={playerScore} 
               agentScore={agentScore} 
+              sunkShips={mergedSunkShips}
             />
             
             <GameLogs 
@@ -570,7 +659,7 @@ export default function Home() {
               className={`${styles.btn} ${styles.btnSecondary}`}
               style={{ display: 'flex', gap: '0.5rem', width: '100%', padding: '0.6rem' }}
             >
-              <RefreshCw size={16} />
+              <HomeIcon size={16} />
               Return to Control Room
             </button>
           </div>

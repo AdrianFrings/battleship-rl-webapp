@@ -266,7 +266,24 @@
 }
 
 .cellPlayable:hover {
-  background-color: #f1f5f9;
+  background-color: rgba(37, 99, 235, 0.15) !important;
+  box-shadow: inset 0 0 0 2px var(--navy-secondary) !important;
+}
+
+.cellAgent.cellPlayable:hover {
+  background-color: rgba(220, 38, 38, 0.4) !important;
+  box-shadow: inset 0 0 0 3px #ef4444, 0 0 10px rgba(239, 68, 68, 0.5) !important;
+  border-color: #f87171 !important;
+  cursor: crosshair;
+  transition: all 0.15s ease-in-out;
+}
+
+.cellPlayer.cellPlayable:hover {
+  background-color: rgba(37, 99, 235, 0.4) !important;
+  box-shadow: inset 0 0 0 3px #3b82f6, 0 0 10px rgba(59, 130, 246, 0.5) !important;
+  border-color: #60a5fa !important;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
 }
 
 /* Cell state modifiers */
@@ -287,10 +304,11 @@
 .cellSunk {
   background-color: var(--state-sunk) !important;
   color: #ffffff !important;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 900;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
-  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
+  border: 1px solid #fee2e2 !important;
+  animation: sunk-pop 0.45s ease-out, sunk-blink 1.5s infinite ease-in-out;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8), inset 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
 .cellMiss {
@@ -310,9 +328,10 @@
 }
 
 .cellPlacementHover {
-  background-color: var(--state-hover) !important;
-  color: #ffffff;
-  opacity: 0.8;
+  background-color: #06b6d4 !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 0 0 2px #0891b2, 0 0 8px rgba(6, 182, 212, 0.5) !important;
+  opacity: 0.95;
 }
 
 /* Stats panel */
@@ -435,17 +454,204 @@
 
 .toast {
   position: fixed;
-  bottom: 2rem;
+  top: 4rem;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--navy-primary);
+  background-color: var(--state-sunk);
   color: #ffffff;
-  padding: 0.75rem 1.5rem;
-  border-radius: 50px;
-  font-weight: 700;
-  font-size: 0.875rem;
-  box-shadow: var(--shadow-md);
+  padding: 0.9rem 2rem;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 15px rgba(220, 38, 38, 0.4);
   z-index: 200;
   pointer-events: none;
-  animation: ripple-miss 0.2s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: screen-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
 }
+
+/* Two-column setup dashboard */
+.setupContainer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .setupContainer {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+/* Tactical description block */
+.gameDescBlock {
+  background-color: var(--navy-light);
+  border-left: 4px solid var(--navy-primary);
+  padding: 1rem 1.25rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.gameDescBlock p {
+  margin-bottom: 0.5rem;
+}
+.gameDescBlock p:last-child {
+  margin-bottom: 0;
+}
+
+/* Winrate Bar Chart styles */
+.winrateContainer {
+  background-color: #fafafa;
+  border: 1px solid var(--border-slate);
+  border-radius: 6px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.winrateTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  letter-spacing: 0.05em;
+  border-bottom: 1px dashed var(--border-slate);
+  padding-bottom: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.winrateBarWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.winrateBarRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.winrateBarLabel {
+  width: 90px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.winrateBarOuter {
+  flex: 1;
+  height: 14px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.winrateBarInner {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease-in-out;
+}
+
+.winrateBarValue {
+  width: 40px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+/* Leaderboard Board */
+.leaderboardCard {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-slate);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.leaderboardTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.leaderboardHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  text-align: left;
+  border-bottom: 2px solid var(--navy-light);
+  padding: 0.5rem 0.25rem;
+}
+
+.leaderboardRow {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s;
+}
+
+.leaderboardRow:hover {
+  background-color: var(--navy-light);
+}
+
+.leaderboardCell {
+  padding: 0.6rem 0.25rem;
+  color: var(--text-primary);
+}
+
+.leaderboardRank {
+  font-weight: 800;
+  color: var(--navy-primary);
+}
+
+.leaderboardName {
+  font-weight: 600;
+}
+
+.leaderboardTurns {
+  font-weight: 800;
+  color: var(--state-hit);
+  text-align: center;
+}
+
+/* Keyframes scoped directly within this CSS module to ensure correct scoping and execution */
+@keyframes sunk-pop {
+  0% { transform: scale(0.6); opacity: 0.5; filter: brightness(1.8); }
+  50% { transform: scale(1.25); filter: brightness(1.4); }
+  100% { transform: scale(1.0); opacity: 1; filter: brightness(1); }
+}
+
+@keyframes sunk-blink {
+  0%, 100% { background-color: var(--state-sunk); box-shadow: 0 0 6px rgba(220, 38, 38, 0.5); }
+  50% { background-color: #ef4444; box-shadow: 0 0 14px rgba(239, 68, 68, 0.9); }
+}
+
+@keyframes sonar-pulse {
+  0% { transform: scale(0.95); opacity: 0.8; box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.5); }
+  50% { transform: scale(1.03); opacity: 1; box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.8); }
+  100% { transform: scale(0.95); opacity: 0.8; box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.5); }
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-3px, 1px); }
+  20%, 40%, 60%, 80% { transform: translate(3px, -1px); }
+}
+

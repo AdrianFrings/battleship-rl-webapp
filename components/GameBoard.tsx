@@ -71,11 +71,14 @@ export default function GameBoard({
       const cellData = board ? board[r][c] : 'NONE:EMPTY';
       const [shipType, state] = cellData.split(':');
       
-      let cellClass = `${styles.cell}`;
+      let cellClass = `${styles.cell} ${prefix === 'p' ? styles.cellPlayer : styles.cellAgent}`;
       let content = '';
 
+      const isCellPlayable = prefix === 'a' ? !!onCellClick : !!onPlayerCellClick;
       if (state === 'EMPTY') {
-        cellClass += ` ${styles.cellPlayable}`;
+        if (isCellPlayable) {
+          cellClass += ` ${styles.cellPlayable}`;
+        }
         if (shipType !== 'NONE') {
           cellClass += ` ${styles.cellShip}`;
           // Only show ship letters on your own board, not in enemy fog-of-war
@@ -88,6 +91,7 @@ export default function GameBoard({
         content = '✕';
         if (sunkShips.has(shipType)) {
           cellClass += ` ${styles.cellSunk}`;
+          content = '☠'; // Skull icon for sunk vessels!
         }
       } else if (state === 'MISS') {
         cellClass += ` ${styles.cellMiss}`;

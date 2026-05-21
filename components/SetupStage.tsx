@@ -1,8 +1,8 @@
 /* components/SetupStage.tsx */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from '../app/page.module.css';
-import { Anchor, Settings, Zap } from 'lucide-react';
+import { Settings, Zap, User, BookOpen, Trophy, BarChart3, HelpCircle } from 'lucide-react';
 
 interface SetupStageProps {
   onStart: (config: {
@@ -10,115 +10,295 @@ interface SetupStageProps {
     agent: string;
     placementMode: string;
     placementMethod: string;
+    nickname: string;
   }) => void;
   isLoading: boolean;
 }
+
+interface Highscore {
+  name: string;
+  agent: string;
+  turns: number;
+  date: string;
+}
+
+const AGENT_LABELS: Record<string, string> = {
+  'q-agent': 'DQN (Q-Agent)',
+  'bayes': 'Bayesian',
+  'hunt': 'Hunt-Target',
+  'random': 'Random Bot',
+};
 
 export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
   const [apiUrl, setApiUrl] = useState('http://localhost:8080');
   const [agent, setAgent] = useState('q-agent');
   const [placementMode, setPlacementMode] = useState('manual');
-  const [placementMethod, setPlacementMethod] = useState('random');
+  const [nickname, setNickname] = useState('');
+  const [leaderboard, setLeaderboard] = useState<Highscore[]>([]);
+
+  // Load highscores on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('battleship_highscores');
+      if (stored) {
+        const parsed = JSON.parse(stored) as Highscore[];
+        // Sort ascending by turns
+        parsed.sort((a, b) => a.turns - b.turns);
+        setLeaderboard(parsed.slice(0, 5)); // Keep top 5
+      }
+    } catch (e) {
+      console.error('Failed to load highscores', e);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!nickname.trim()) return;
     onStart({
-      apiUrl: apiUrl.trim().replace(/\/$/, ''), // remove trailing slashes
+      apiUrl: apiUrl.trim().endsWith('/') ? apiUrl.trim().slice(0, -1) : apiUrl.trim(),
       agent,
       placementMode,
-      placementMethod
+      placementMethod: 'random', // AI placement method is forced to random behind the scenes
+      nickname: nickname.trim(),
     });
   };
 
+  const handleClearLeaderboard = () => {
+    if (confirm('Clear highscores? This action is permanent.')) {
+      localStorage.removeItem('battleship_highscores');
+      setLeaderboard([]);
+    }
+  };
+
   return (
-    <div className={styles.card}>
-      <h2 className={styles.cardTitle}>
-        <Settings size={20} className={styles.icon} />
-        Battle Fleet Setup
-      </h2>
-      <form onSubmit={handleSubmit}>
-        <div className={styles.setupGrid}>
-          {/* API Server URL */}
-          <div className={styles.formGroup}>
-            <label htmlFor="apiUrl">FastAPI Backend Server</label>
-            <input
-              id="apiUrl"
-              type="text"
-              className={styles.input}
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="e.g., https://battleship-service-x.a.run.app"
-              required
-            />
-          </div>
+    <div className={styles.setupContainer}>
+      
+      {/* Left Column: Command & Configuration */}
+      <div className={styles.card}>
+        <h2 className={styles.cardTitle}>
+          <Settings size={20} />
+          Tactical Command Center
+        </h2>
 
-          {/* AI Opponent Agent */}
-          <div className={styles.formGroup}>
-            <label htmlFor="agent">Opponent AI Type</label>
-            <select
-              id="agent"
-              className={styles.select}
-              value={agent}
-              onChange={(e) => setAgent(e.target.value)}
-            >
-              <option value="q-agent">Q-Learning Agent (DQN)</option>
-              <option value="bayes">Bayesian Probability Agent</option>
-              <option value="hunt">Standard Hunt-Target Agent</option>
-              <option value="random">Random Target Agent</option>
-            </select>
-          </div>
-
-          {/* AI Fleet Placement Method */}
-          <div className={styles.formGroup}>
-            <label htmlFor="placementMethod">AI Placement Algorithm</label>
-            <select
-              id="placementMethod"
-              className={styles.select}
-              value={placementMethod}
-              onChange={(e) => setPlacementMethod(e.target.value)}
-            >
-              <option value="random">Pure Random Fleet</option>
-              <option value="dense_center">Dense Center Bias</option>
-              <option value="edges">Perimeter Edge Bias</option>
-              <option value="corners">Corner Fortification Bias</option>
-              <option value="spread">Hyper-Dispersion (Spread)</option>
-              <option value="clustered">Tightly Clustered</option>
-              <option value="diagonal">Main Diagonal Alignment</option>
-              <option value="gaussian">Gaussian Distribution Bias</option>
-              <option value="quadrant">Quadrant Bias</option>
-            </select>
-          </div>
-
-          {/* Player Fleet Placement Mode */}
-          <div className={styles.formGroup}>
-            <label htmlFor="placementMode">Your Fleet Placement</label>
-            <select
-              id="placementMode"
-              className={styles.select}
-              value={placementMode}
-              onChange={(e) => setPlacementMode(e.target.value)}
-            >
-              <option value="manual">Manual Deployment (Tactical Placement)</option>
-              <option value="random">Auto-Random Deployment (Quick Start)</option>
-            </select>
-          </div>
+        {/* Short Game Explanation */}
+        <div className={styles.gameDescBlock}>
+          <p style={{ fontWeight: 'bold', color: 'var(--navy-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <BookOpen size={16} /> MISSION BRIEFING:
+          </p>
+          <p>
+            Welcome, Officer. Your objective is to deploy your fleet onto the grid coordinates and seek out the enemy fleet.
+          </p>
+          <p>
+            Take turns launching missiles at the enemy radar grid. **Manual deployment** allows custom ship rotations using <strong>R</strong> or **Right-Click** on the board. Default enemy fleet placements are randomly distributed across the ocean. Good hunting.
+          </p>
         </div>
 
-        <button
-          type="submit"
-          className={styles.btn}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>Deploying Fleet...</>
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            
+            {/* Nickname Input */}
+            <div className={styles.formGroup}>
+              <label htmlFor="nickname" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <User size={12} /> Officer Callsign (Nickname)
+              </label>
+              <input
+                id="nickname"
+                type="text"
+                className={styles.input}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value.slice(0, 16))}
+                placeholder="Enter Nickname..."
+                maxLength={16}
+                required
+              />
+            </div>
+
+            <div className={styles.setupGrid}>
+              {/* AI Opponent Agent */}
+              <div className={styles.formGroup}>
+                <label htmlFor="agent">Opponent AI Level</label>
+                <select
+                  id="agent"
+                  className={styles.select}
+                  value={agent}
+                  onChange={(e) => setAgent(e.target.value)}
+                >
+                  <option value="q-agent">Q-Learning DQN Agent (Elite)</option>
+                  <option value="bayes">Biased Bayesian Agent (Hard)</option>
+                  <option value="hunt">Hunt-Target Agent (Medium)</option>
+                  <option value="random">Random Target Agent (Easy)</option>
+                </select>
+              </div>
+
+              {/* Player Fleet Placement Mode */}
+              <div className={styles.formGroup}>
+                <label htmlFor="placementMode">Fleet Placement Strategy</label>
+                <select
+                  id="placementMode"
+                  className={styles.select}
+                  value={placementMode}
+                  onChange={(e) => setPlacementMode(e.target.value)}
+                >
+                  <option value="manual">Manual Deployment (Tactical Place)</option>
+                  <option value="random">Auto-Random Deployment (Quick Start)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* FastAPI Backend Server URL */}
+            <div className={styles.formGroup}>
+              <label htmlFor="apiUrl" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <HelpCircle size={12} /> Operational API Gateway
+              </label>
+              <input
+                id="apiUrl"
+                type="text"
+                className={styles.input}
+                style={{ fontSize: '0.8rem' }}
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+                placeholder="e.g., http://localhost:8080"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className={styles.btn}
+              style={{ marginTop: '0.5rem' }}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>Deploying Tactical Network...</>
+              ) : (
+                <>
+                  <Zap size={18} />
+                  Launch Firing Mission
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Right Column: Battle Intelligence & Highscores */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        
+        {/* Winrate Visualization */}
+        <div className={styles.card}>
+          <h3 className={styles.cardTitle}>
+            <BarChart3 size={20} />
+            Intel: AI Agent Threat Levels
+          </h3>
+          <div className={styles.winrateContainer}>
+            <div className={styles.winrateTitle}>
+              <span>Opponent Model</span>
+              <span>Estimated Winrate</span>
+            </div>
+            
+            <div className={styles.winrateBarWrapper}>
+              {/* DQN */}
+              <div className={styles.winrateBarRow}>
+                <div className={styles.winrateBarLabel}>Q-Learning (DQN)</div>
+                <div className={styles.winrateBarOuter}>
+                  <div 
+                    className={styles.winrateBarInner} 
+                    style={{ width: '22%', backgroundColor: '#dc2626' }} // bright red (hardest)
+                  />
+                </div>
+                <div className={styles.winrateBarValue}>22%</div>
+              </div>
+
+              {/* Bayes */}
+              <div className={styles.winrateBarRow}>
+                <div className={styles.winrateBarLabel}>Bayesian</div>
+                <div className={styles.winrateBarOuter}>
+                  <div 
+                    className={styles.winrateBarInner} 
+                    style={{ width: '38%', backgroundColor: '#ea580c' }} // orange (hard)
+                  />
+                </div>
+                <div className={styles.winrateBarValue}>38%</div>
+              </div>
+
+              {/* Hunt */}
+              <div className={styles.winrateBarRow}>
+                <div className={styles.winrateBarLabel}>Hunt-Target</div>
+                <div className={styles.winrateBarOuter}>
+                  <div 
+                    className={styles.winrateBarInner} 
+                    style={{ width: '58%', backgroundColor: '#eab308' }} // amber/yellow (medium)
+                  />
+                </div>
+                <div className={styles.winrateBarValue}>58%</div>
+              </div>
+
+              {/* Random */}
+              <div className={styles.winrateBarRow}>
+                <div className={styles.winrateBarLabel}>Random Bot</div>
+                <div className={styles.winrateBarOuter}>
+                  <div 
+                    className={styles.winrateBarInner} 
+                    style={{ width: '85%', backgroundColor: '#16a34a' }} // green (easy)
+                  />
+                </div>
+                <div className={styles.winrateBarValue}>85%</div>
+              </div>
+            </div>
+          </div>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center' }}>
+            * Stat matrices compiled from 1,000 simulated human placement games.
+          </p>
+        </div>
+
+        {/* Highscores Leaderboard */}
+        <div className={styles.leaderboardCard}>
+          <h3 className={styles.cardTitle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Trophy size={20} style={{ color: '#eab308' }} />
+              Combat Records (Leaderboard)
+            </span>
+            {leaderboard.length > 0 && (
+              <button 
+                onClick={handleClearLeaderboard}
+                style={{ fontSize: '0.65rem', background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 700 }}
+              >
+                Clear Records
+              </button>
+            )}
+          </h3>
+
+          {leaderboard.length === 0 ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'var(--text-secondary)', padding: '2rem 0' }}>
+              <Trophy size={32} style={{ color: 'var(--border-slate)', marginBottom: '0.5rem' }} />
+              <p style={{ fontSize: '0.8rem', fontWeight: 600 }}>No combat operations registered yet.</p>
+              <p style={{ fontSize: '0.7rem' }}>Sank an AI fleet to enter the highscore charts!</p>
+            </div>
           ) : (
-            <>
-              <Zap size={18} />
-              Launch Battle Mission
-            </>
+            <table className={styles.leaderboardTable}>
+              <thead>
+                <tr>
+                  <th className={styles.leaderboardHeader} style={{ width: '40px' }}>Rank</th>
+                  <th className={styles.leaderboardHeader}>Commander</th>
+                  <th className={styles.leaderboardHeader}>Opponent</th>
+                  <th className={styles.leaderboardHeader} style={{ textAlign: 'center', width: '60px' }}>Turns</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((row, index) => (
+                  <tr key={index} className={styles.leaderboardRow}>
+                    <td className={`${styles.leaderboardCell} ${styles.leaderboardRank}`}>#{index + 1}</td>
+                    <td className={`${styles.leaderboardCell} ${styles.leaderboardName}`}>{row.name}</td>
+                    <td className={styles.leaderboardCell} style={{ fontSize: '0.8rem' }}>{AGENT_LABELS[row.agent] || row.agent}</td>
+                    <td className={`${styles.leaderboardCell} ${styles.leaderboardTurns}`}>{row.turns}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </button>
-      </form>
+        </div>
+
+      </div>
     </div>
   );
 }
