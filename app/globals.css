@@ -1,0 +1,87 @@
+/* app/globals.css */
+
+:root {
+  /* Tactical Marine & Blueprint Design Palette */
+  --bg-ocean: #f0f4f8;          /* Light ocean-mist off-white */
+  --bg-panel: #ffffff;          /* Clean white card backgrounds */
+  --text-primary: #0f172a;      /* Deep navy primary text */
+  --text-secondary: #475569;    /* Ocean-mist gray subtext */
+  --navy-primary: #1e3a8a;      /* Command-center deep navy */
+  --navy-secondary: #2563eb;    /* Crisp ocean blue */
+  --navy-light: #eff6ff;        /* Soft navy hover tint */
+  --border-slate: #cbd5e1;      /* Clean blueprint divider slate */
+  
+  /* Game cell states (clean and non-stylized) */
+  --state-empty: #f8fafc;
+  --state-ship: #0d9488;        /* Professional tactical Teal for ships */
+  --state-hit: #dc2626;         /* Clear Coral/Crimson Red for direct hits */
+  --state-miss: #94a3b8;        /* Soft Blue-Slate for misses/water splashes */
+  --state-sunk: #7f1d1d;        /* Deep Crimson for completely sunk ships */
+  --state-hover: #38bdf8;       /* Clean Sky Blue for active placement preview */
+  
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-ocean);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-slate);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Firing & Shaking animations */
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-3px, 1px); }
+  20%, 40%, 60%, 80% { transform: translate(3px, -1px); }
+}
+
+.shake {
+  animation: screen-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes flash-hit {
+  0% { background-color: #ff3333; transform: scale(1.15); }
+  100% { background-color: var(--state-hit); transform: scale(1.00); }
+}
+
+.flash-hit-anim {
+  animation: flash-hit 0.3s ease-out;
+}
+
+@keyframes ripple-miss {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ripple-miss-anim {
+  animation: ripple-miss 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
