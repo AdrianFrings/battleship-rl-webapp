@@ -1,0 +1,78 @@
+import { NextResponse } from 'next/server';
+import { kv } from '@vercel/kv';
+
+export const dynamic = 'force-dynamic';
+
+// Simple in-memory fallback for local development if KV is not configured
+let localLeaderboardFallback: any[] = [];
+
+const isKvConfigured = () => {
+  return !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN;
+};
+
+export async function GET() {
+  try {
+    if (!isKvConfigured()) {
+      console.warn("Vercel KV is not configured. Falling back to in-memory leaderboard.");
+      return NextResponse.json({ success: true, records: localLeaderboardFallback.slice(0, 25) });
+    }
+
+    const rawList = await kv.zrange('battleship_leaderboard', 0, 24);
+    const records = rawList.map((item: any) => {
+      try {
+        return typeof item === 'string' ? JSON.parse(item) : item;
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+
+    return NextResponse.json({ success: true, records });
+  } catch (error: any) {
+    console.error('Error fetching leaderboard:', error);
+    // Fall back gracefully to in-memory in case of DB read failures
+    return NextResponse.json({ success: true, records: localLeaderboardFallback.slice(0, 25) });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { name, turns, agent } = body;
+
+    if (!name || typeof turns !== 'number' || !agent) {
+      return NextResponse.json({ success: false, error: 'Invalid record data' }, { status: 400 });
+    }
+
+    const newRecord = {
+      id: Math.random().toString(36).substr(2, 9) + Date.now(),
+      name: name.slice(0, 16),
+      turns,
+      agent,
+      date: new Date().toLocaleDateString(),
+    };
+
+    if (!isKvConfigured()) {
+      console.warn("Vercel KV is not configured. Storing highscore in-memory.");
+      localLeaderboardFallback.push(newRecord);
+      localLeaderboardFallback.sort((a, b) => a.turns - b.turns);
+      localLeaderboardFallback = localLeaderboardFallback.slice(0, 100);
+      return NextResponse.json({ success: true, record: newRecord });
+    }
+
+    await kv.zadd('battleship_leaderboard', {
+      score: turns,
+      member: JSON.stringify(newRecord),
+    });
+
+    // Cap the leaderboard to top 100 entries to save space/requests
+    const totalCount = await kv.zcard('battleship_leaderboard');
+    if (totalCount > 100) {
+      await kv.zremrangebyrank('battleship_leaderboard', 100, -1);
+    }
+
+    return NextResponse.json({ success: true, record: newRecord });
+  } catch (error: any) {
+    console.error('Error saving highscore:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

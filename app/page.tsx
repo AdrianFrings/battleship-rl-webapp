@@ -17,7 +17,7 @@ const COLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const getSunkShipsFromBoard = (board: string[][] | null): Set<string> => {
   const sunk = new Set<string>();
   if (!board) return sunk;
-  
+
   const hits: Record<string, number> = {
     CARRIER: 0,
     BATTLESHIP: 0,
@@ -105,6 +105,11 @@ export default function Home() {
   const turnCountRef = useRef(turnCount);
   turnCountRef.current = turnCount;
 
+  const sunkShipsRef = useRef<{ p: Set<string>; a: Set<string> }>({
+    p: new Set(),
+    a: new Set(),
+  });
+
   // End game stats
   const [winner, setWinner] = useState<string | null>(null);
   const [totalTurns, setTotalTurns] = useState(0);
@@ -143,33 +148,23 @@ export default function Home() {
     }
   };
 
-  const registerHighscore = (turns: number) => {
+  const registerHighscore = async (turns: number) => {
     try {
-      const key = 'battleship_highscores';
-      const stored = localStorage.getItem(key);
-      const records = stored ? JSON.parse(stored) : [];
-      
-      // Check if this record already exists (avoid duplicates in case both callbacks fire)
-      const isDuplicate = records.some((r: any) => 
-        r.name === (nicknameRef.current || 'Commander') && 
-        r.turns === turns && 
-        r.agent === (opponentAgentRef.current || 'q-agent') &&
-        Math.abs(new Date(r.date).getTime() - new Date().getTime()) < 5000 // within 5 seconds
-      );
-      if (isDuplicate) return;
-
-      records.push({
-        name: nicknameRef.current || 'Commander',
-        turns: turns,
-        agent: opponentAgentRef.current || 'q-agent',
-        date: new Date().toLocaleDateString(),
+      const response = await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nicknameRef.current || 'Commander',
+          turns: turns,
+          agent: opponentAgentRef.current || 'q-agent',
+        }),
       });
-      // Sort ascending by turns (fewer turns is better)
-      records.sort((a: any, b: any) => a.turns - b.turns);
-      // Save only top 25 records
-      localStorage.setItem(key, JSON.stringify(records.slice(0, 25)));
+
+      if (!response.ok) {
+        console.error('Failed to submit highscore to API:', await response.text());
+      }
     } catch (e) {
-      console.error("Failed to register combat record highscore", e);
+      console.error("Failed to register combat record highscore via API", e);
     }
   };
 
@@ -188,6 +183,7 @@ export default function Home() {
     setPlayerScore({ sunk: 0, hit: 0 });
     setAgentScore({ sunk: 0, hit: 0 });
     setSunkShips({ p: new Set(), a: new Set() });
+    sunkShipsRef.current = { p: new Set(), a: new Set() };
     setPlayerLogs([]);
     setAgentLogs([]);
     setPlacingShip(null);
@@ -232,7 +228,7 @@ export default function Home() {
 
       const data = await response.json();
       setGameId(data.game_id);
-      
+
       // Open WebSocket connection
       const wsUrl = convertToWsUrl(config.apiUrl, data.game_id);
       connectWebSocket(wsUrl, data.game_id);
@@ -278,7 +274,7 @@ export default function Home() {
           if (msg.valid) {
             const currentShip = placingShipRef.current || 'ship';
             addLog(`Deployed ship: ${currentShip}`, "info", "player");
-            
+
             // Color ship locally for feedback before game_start
             const currentBoard = yourBoardRef.current;
             if (lastPlacementRef.current && currentBoard) {
@@ -294,7 +290,7 @@ export default function Home() {
               setYourBoard(updatedBoard);
               yourBoardRef.current = updatedBoard; // Sync ref immediately
             }
-            
+
             setPlacingShip(null);
             setPlacementHoverCells([]);
             lastPlacementRef.current = null;
@@ -343,14 +339,14 @@ export default function Home() {
           const hitSuccess = msg.result === "HIT";
           let typeVal: 'hit' | 'miss' | 'sunk' = hitSuccess ? 'hit' : 'miss';
           let logTxt = `Targeted ${msg.coordinate}: ${msg.result}`;
-          
+
           if (msg.ship_sunk) {
             logTxt += ` (SUNK opponent's ${msg.ship_sunk}!)`;
             typeVal = 'sunk';
           } else if (msg.ship_hit) {
             logTxt += ` (Hit ${msg.ship_hit})`;
           }
-          
+
           addLog(logTxt, typeVal, "player");
           setMyTurn(false);
 
@@ -393,6 +389,7 @@ export default function Home() {
                 a: updated,
               };
             });
+            sunkShipsRef.current.a.add(msg.ship_sunk);
           }
 
           // Preemptively check if the move resulted in game over
@@ -408,7 +405,7 @@ export default function Home() {
         case "ship_sunk":
           const isPlayer = msg.attacker === "player";
           const side = isPlayer ? 'a' : 'p';
-          
+
           setSunkShips(prev => {
             const updated = new Set(prev[side]);
             updated.add(msg.ship);
@@ -417,6 +414,7 @@ export default function Home() {
               [side]: updated,
             };
           });
+          sunkShipsRef.current[side].add(msg.ship);
 
           const targetLabel = isPlayer ? "enemy's" : "your";
           const subjectLabel = isPlayer ? "You" : "AI opponent";
@@ -455,14 +453,14 @@ export default function Home() {
             const hitAgent = lm.result === "HIT";
             let aType: 'hit' | 'miss' | 'sunk' = hitAgent ? 'hit' : 'miss';
             let aLog = `AI targeted ${lm.coordinate}: ${lm.result}`;
-            
+
             if (lm.ship_sunk) {
               aLog += ` (SUNK your ${lm.ship_sunk}!)`;
               aType = 'sunk';
             } else if (lm.ship_hit) {
               aLog += ` (Hit your ${lm.ship_hit})`;
             }
-            
+
             addLog(aLog, aType, "agent");
             if (hitAgent) {
               triggerScreenShake();
@@ -508,18 +506,21 @@ export default function Home() {
       setIsWsConnected(false);
       setIsLoading(false);
       addLog("Disconnected from operational grid.", "hit", "player");
-      
+
       // Auto-detect game over as a robust client-side fallback
       const derivedYourSunk = getSunkShipsFromBoard(yourBoardRef.current);
       const derivedEnemySunk = getSunkShipsFromBoard(enemyBoardRef.current);
-      
-      if (derivedYourSunk.size === 5 || derivedEnemySunk.size === 5) {
+
+      const finalYourSunk = new Set([...Array.from(sunkShipsRef.current.p), ...Array.from(derivedYourSunk)]);
+      const finalEnemySunk = new Set([...Array.from(sunkShipsRef.current.a), ...Array.from(derivedEnemySunk)]);
+
+      if (finalYourSunk.size === 5 || finalEnemySunk.size === 5) {
         gameStateRef.current = 'game_over';
         setGameState('game_over');
-        const finalWinner = derivedEnemySunk.size === 5 ? 'player' : 'agent';
+        const finalWinner = finalEnemySunk.size === 5 ? 'player' : 'agent';
         setWinner(finalWinner);
         setTotalTurns(turnCountRef.current);
-        
+
         if (finalWinner === 'player') {
           registerHighscore(turnCountRef.current);
         }
@@ -572,7 +573,7 @@ export default function Home() {
 
   const handlePlayerCellClick = (coordinate: string, r: number, c: number) => {
     if (gameState !== 'placement' || !placingShip || !socketRef.current) return;
-    
+
     // Check bounds
     const endRow = placeDirection === 'down' ? r + placingSize - 1 : r;
     const endCol = placeDirection === 'right' ? c + placingSize - 1 : c;
@@ -646,10 +647,9 @@ export default function Home() {
           Battleship <span>RL</span>
         </h1>
         <div className={styles.statusIndicator}>
-          <span 
-            className={`${styles.dot} ${
-              isWsConnected ? styles.dotConnected : styles.dotDisconnected
-            }`} 
+          <span
+            className={`${styles.dot} ${isWsConnected ? styles.dotConnected : styles.dotDisconnected
+              }`}
           />
           {isWsConnected ? 'Radar Active' : 'Disconnected'}
         </div>
@@ -657,23 +657,23 @@ export default function Home() {
 
       {/* Error Message banner */}
       {errorMessage && (
-        <div 
-          className={styles.card} 
-          style={{ 
-            backgroundColor: '#fee2e2', 
-            border: '1px solid #f87171', 
-            color: '#991b1b', 
-            padding: '1rem', 
-            display: 'flex', 
-            alignItems: 'center', 
+        <div
+          className={styles.card}
+          style={{
+            backgroundColor: '#fee2e2',
+            border: '1px solid #f87171',
+            color: '#991b1b',
+            padding: '1rem',
+            display: 'flex',
+            alignItems: 'center',
             gap: '0.75rem',
             fontWeight: 600
           }}
         >
           <AlertCircle size={20} />
           <div>{errorMessage}</div>
-          <button 
-            onClick={() => setErrorMessage(null)} 
+          <button
+            onClick={() => setErrorMessage(null)}
             style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#991b1b', cursor: 'pointer', fontWeight: 800 }}
           >
             ✕
@@ -704,10 +704,10 @@ export default function Home() {
 
             {/* Boards Grid */}
             <div className={styles.boards}>
-              
+
               {/* Left Board: Player Board */}
               <div className={styles.boardWrapper}>
-                <h3 className={styles.boardTitle}>Your Fleet (Ocean Area)</h3>
+                <h3 className={styles.boardTitle}>Your Board</h3>
                 <div className={styles.statsBox}>
                   Ships Sunk: <span>{agentScore.sunk} / 5</span>
                   Hits: <span>{agentScore.hit}</span>
@@ -725,7 +725,7 @@ export default function Home() {
 
               {/* Right Board: Agent Board */}
               <div className={styles.boardWrapper}>
-                <h3 className={styles.boardTitle}>Enemy Waters (Radar Grid)</h3>
+                <h3 className={styles.boardTitle}>Enemy Board</h3>
                 <div className={styles.statsBox}>
                   Ships Sunk: <span>{playerScore.sunk} / 5</span>
                   Hits: <span>{playerScore.hit}</span>
@@ -751,16 +751,16 @@ export default function Home() {
                 onRotate={toggleDirection}
               />
             )}
-            
-            <StatsPanel 
-              playerScore={playerScore} 
-              agentScore={agentScore} 
+
+            <StatsPanel
+              playerScore={playerScore}
+              agentScore={agentScore}
               sunkShips={mergedSunkShips}
             />
-            
-            <GameLogs 
-              playerLogs={playerLogs} 
-              agentLogs={agentLogs} 
+
+            <GameLogs
+              playerLogs={playerLogs}
+              agentLogs={agentLogs}
             />
 
             <button
@@ -787,27 +787,27 @@ export default function Home() {
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
             <h2 className={styles.modalTitle}>
-              {winner === 'player' ? '🏆 VICTORY CONFIRMED' : '💀 FLEET DEFEATED'}
+              {winner === 'player' ? '🏆 VICTORY!' : '💀 DEFEAT'}
             </h2>
             <div className={styles.modalDesc}>
               <p style={{ marginBottom: '1rem', fontWeight: 600 }}>
-                {winner === 'player' 
-                  ? 'You successfully navigated the operational theater and sank the AI fleet!'
-                  : 'The AI successfully identified and eliminated all vessels in your fleet.'
+                {winner === 'player'
+                  ? 'You made FS and Jan Nagler proud! You will still fail the ML2 exam, though...'
+                  : 'You lost against the AI? Yikes...Maybe you should have paid more attention in class.'
                 }
               </p>
               <div style={{ backgroundColor: 'var(--bg-ocean)', padding: '1rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                <p style={{ marginBottom: '0.5rem' }}><strong>Operational Report:</strong></p>
+                <p style={{ marginBottom: '0.5rem' }}><strong>Game Report:</strong></p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', textAlign: 'left' }}>
-                  <div>Total Mission Turns:</div><div style={{ textAlign: 'right', fontWeight: 'bold' }}>{totalTurns}</div>
+                  <div>Total Turns:</div><div style={{ textAlign: 'right', fontWeight: 'bold' }}>{totalTurns}</div>
                   <div>Your Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--navy-primary)' }}>{playerScore.hit}</div>
                   <div>AI Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--state-hit)' }}>{agentScore.hit}</div>
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button 
-                onClick={resetGameEngine} 
+              <button
+                onClick={resetGameEngine}
                 className={styles.btn}
                 style={{ flex: 1 }}
               >

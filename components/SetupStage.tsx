@@ -38,17 +38,20 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
 
   // Load highscores on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('battleship_highscores');
-      if (stored) {
-        const parsed = JSON.parse(stored) as Highscore[];
-        // Sort ascending by turns
-        parsed.sort((a, b) => a.turns - b.turns);
-        setLeaderboard(parsed.slice(0, 5)); // Keep top 5
+    const fetchLeaderboard = async () => {
+      try {
+        const response = await fetch('/api/leaderboard');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.records) {
+            setLeaderboard(data.records.slice(0, 5)); // Keep top 5
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load highscores from API', e);
       }
-    } catch (e) {
-      console.error('Failed to load highscores', e);
-    }
+    };
+    fetchLeaderboard();
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -67,12 +70,12 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
 
   return (
     <div className={styles.setupContainer}>
-      
+
       {/* Left Column: Command & Configuration */}
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>
           <Settings size={20} />
-          Tactical Command Center
+          Game Setup
         </h2>
 
         {/* Short Game Explanation */}
@@ -81,20 +84,20 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
             <BookOpen size={16} /> MISSION BRIEFING:
           </p>
           <p>
-            Welcome, Officer. Your objective is to deploy your fleet onto the grid coordinates and seek out the enemy fleet.
+            Welcome, Officer. Your objective is to make Frankfurt School proud by deploying your fleet onto the grid beating the AI.
           </p>
           <p>
-            Take turns launching missiles at the enemy radar grid. **Manual deployment** allows custom ship rotations using <strong>R</strong> or **Right-Click** on the board. Default enemy fleet placements are randomly distributed across the ocean. Good hunting.
+            Take turns launching attacks at the enemy radar grid. Manual deployment allows you to hide your ships on the grid yourself. Default enemy fleet placements are randomly distributed across the ocean. Good hunting.
           </p>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
+
             {/* Nickname Input */}
             <div className={styles.formGroup}>
               <label htmlFor="nickname" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <User size={12} /> Officer Callsign (Nickname)
+                <User size={12} /> Your Name (or nickname)
               </label>
               <input
                 id="nickname"
@@ -118,10 +121,10 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
                   value={agent}
                   onChange={(e) => setAgent(e.target.value)}
                 >
-                  <option value="q-agent">Q-Learning DQN Agent (Elite)</option>
-                  <option value="bayes">Biased Bayesian Agent (Hard)</option>
-                  <option value="hunt">Hunt-Target Agent (Medium)</option>
-                  <option value="random">Random Target Agent (Easy)</option>
+                  <option value="q-agent">Q-Learning DQN Agent </option>
+                  <option value="bayes">Biased Bayesian Agent </option>
+                  <option value="hunt">Hunt-Target Agent </option>
+                  <option value="random">Random Target Agent</option>
                 </select>
               </div>
 
@@ -153,7 +156,7 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               ) : (
                 <>
                   <Zap size={18} />
-                  Launch Firing Mission
+                  Start Game
                 </>
               )}
             </button>
@@ -163,26 +166,26 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
 
       {/* Right Column: Battle Intelligence & Highscores */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        
+
         {/* Winrate Visualization */}
         <div className={styles.card}>
           <h3 className={styles.cardTitle}>
             <BarChart3 size={20} />
-            Intel: AI Agent Threat Levels
+            Intel: Agent Difficulty Levels
           </h3>
           <div className={styles.winrateContainer}>
             <div className={styles.winrateTitle}>
               <span>Opponent Model</span>
               <span>Estimated Winrate</span>
             </div>
-            
+
             <div className={styles.winrateBarWrapper}>
               {/* DQN */}
               <div className={styles.winrateBarRow}>
                 <div className={styles.winrateBarLabel}>Q-Learning (DQN)</div>
                 <div className={styles.winrateBarOuter}>
-                  <div 
-                    className={styles.winrateBarInner} 
+                  <div
+                    className={styles.winrateBarInner}
                     style={{ width: '22%', backgroundColor: '#dc2626' }} // bright red (hardest)
                   />
                 </div>
@@ -193,8 +196,8 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <div className={styles.winrateBarRow}>
                 <div className={styles.winrateBarLabel}>Bayesian</div>
                 <div className={styles.winrateBarOuter}>
-                  <div 
-                    className={styles.winrateBarInner} 
+                  <div
+                    className={styles.winrateBarInner}
                     style={{ width: '38%', backgroundColor: '#ea580c' }} // orange (hard)
                   />
                 </div>
@@ -205,8 +208,8 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <div className={styles.winrateBarRow}>
                 <div className={styles.winrateBarLabel}>Hunt-Target</div>
                 <div className={styles.winrateBarOuter}>
-                  <div 
-                    className={styles.winrateBarInner} 
+                  <div
+                    className={styles.winrateBarInner}
                     style={{ width: '58%', backgroundColor: '#eab308' }} // amber/yellow (medium)
                   />
                 </div>
@@ -217,8 +220,8 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <div className={styles.winrateBarRow}>
                 <div className={styles.winrateBarLabel}>Random Bot</div>
                 <div className={styles.winrateBarOuter}>
-                  <div 
-                    className={styles.winrateBarInner} 
+                  <div
+                    className={styles.winrateBarInner}
                     style={{ width: '85%', backgroundColor: '#16a34a' }} // green (easy)
                   />
                 </div>
@@ -227,7 +230,7 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
             </div>
           </div>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center' }}>
-            * Stat matrices compiled from 1,000 simulated human placement games.
+            * Stats based on simulated human placement games.
           </p>
         </div>
 
@@ -251,8 +254,8 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
               <thead>
                 <tr>
                   <th className={styles.leaderboardHeader} style={{ width: '40px' }}>Rank</th>
-                  <th className={styles.leaderboardHeader}>Commander</th>
-                  <th className={styles.leaderboardHeader}>Opponent</th>
+                  <th className={styles.leaderboardHeader}>Name</th>
+                  <th className={styles.leaderboardHeader}>Opponent AI</th>
                   <th className={styles.leaderboardHeader} style={{ textAlign: 'center', width: '60px' }}>Turns</th>
                 </tr>
               </thead>
