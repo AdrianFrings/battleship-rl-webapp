@@ -114,6 +114,14 @@ export default function Home() {
   const [winner, setWinner] = useState<string | null>(null);
   const [totalTurns, setTotalTurns] = useState(0);
 
+  const winnerRef = useRef<string | null>(null);
+  winnerRef.current = winner;
+
+  const totalTurnsRef = useRef(totalTurns);
+  totalTurnsRef.current = totalTurns;
+
+  const highscoreSubmittedRef = useRef<boolean>(false);
+
   // Screen shake and UI toasts
   const [isShaking, setIsShaking] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -149,6 +157,9 @@ export default function Home() {
   };
 
   const registerHighscore = async (turns: number) => {
+    if (highscoreSubmittedRef.current) return;
+    highscoreSubmittedRef.current = true;
+
     // 1. Submit to serverless API database
     try {
       const response = await fetch('/api/leaderboard', {
@@ -222,7 +233,10 @@ export default function Home() {
     setPlacementHoverCells([]);
     lastPlacementRef.current = null;
     setWinner(null);
+    winnerRef.current = null;
     setTotalTurns(0);
+    totalTurnsRef.current = 0;
+    highscoreSubmittedRef.current = false;
     setErrorMessage(null);
   };
 
@@ -239,6 +253,7 @@ export default function Home() {
     setApiUrl(config.apiUrl);
     setNickname(config.nickname);
     setOpponentAgent(config.agent);
+    highscoreSubmittedRef.current = false;
 
     try {
       const response = await fetch(`${config.apiUrl}/games`, {
@@ -426,9 +441,14 @@ export default function Home() {
           if (msg.game_over === true) {
             gameStateRef.current = 'game_over';
             setGameState('game_over');
-            setWinner('player');
+            const calculatedWinner = msg.winner || 'player';
+            setWinner(calculatedWinner);
+            winnerRef.current = calculatedWinner;
             setTotalTurns(turnCountRef.current);
-            registerHighscore(turnCountRef.current);
+            totalTurnsRef.current = turnCountRef.current;
+            if (calculatedWinner === 'player') {
+              registerHighscore(turnCountRef.current);
+            }
           }
           break;
 
@@ -501,10 +521,14 @@ export default function Home() {
           if (msg.game_over === true) {
             gameStateRef.current = 'game_over';
             setGameState('game_over');
-            setWinner(msg.winner || 'agent');
-            setTotalTurns(msg.turn || turnCountRef.current);
-            if (msg.winner === 'player') {
-              registerHighscore(msg.turn || turnCountRef.current);
+            const calculatedWinner = msg.winner || 'agent';
+            setWinner(calculatedWinner);
+            winnerRef.current = calculatedWinner;
+            const finalTurns = msg.turn || turnCountRef.current;
+            setTotalTurns(finalTurns);
+            totalTurnsRef.current = finalTurns;
+            if (calculatedWinner === 'player') {
+              registerHighscore(finalTurns);
             }
           }
           break;
@@ -513,7 +537,9 @@ export default function Home() {
           gameStateRef.current = 'game_over';
           setGameState('game_over');
           setWinner(msg.winner);
+          winnerRef.current = msg.winner;
           setTotalTurns(msg.total_turns);
+          totalTurnsRef.current = msg.total_turns;
           if (msg.scores) {
             setPlayerScore({
               sunk: msg.scores.player.ships_sunk,
@@ -532,10 +558,12 @@ export default function Home() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event: CloseEvent) => {
       setIsWsConnected(false);
       setIsLoading(false);
       addLog("Disconnected from operational grid.", "hit", "player");
+
+      const isNormalClosure = event.code === 1000 || event.reason === "game over";
 
       // Auto-detect game over as a robust client-side fallback
       const derivedYourSunk = getSunkShipsFromBoard(yourBoardRef.current);
@@ -544,15 +572,33 @@ export default function Home() {
       const finalYourSunk = new Set([...Array.from(sunkShipsRef.current.p), ...Array.from(derivedYourSunk)]);
       const finalEnemySunk = new Set([...Array.from(sunkShipsRef.current.a), ...Array.from(derivedEnemySunk)]);
 
-      if (finalYourSunk.size === 5 || finalEnemySunk.size === 5) {
+      const isGameOverDetected = isNormalClosure || finalYourSunk.size === 5 || finalEnemySunk.size === 5;
+
+      if (isGameOverDetected) {
         gameStateRef.current = 'game_over';
         setGameState('game_over');
-        const finalWinner = finalEnemySunk.size === 5 ? 'player' : 'agent';
-        setWinner(finalWinner);
-        setTotalTurns(turnCountRef.current);
+        
+        let finalWinner = winnerRef.current;
+        if (!finalWinner) {
+          if (finalEnemySunk.size === 5) {
+            finalWinner = 'player';
+          } else if (finalYourSunk.size === 5) {
+            finalWinner = 'agent';
+          } else {
+            finalWinner = 'agent';
+          }
+          winnerRef.current = finalWinner;
+          setWinner(finalWinner);
+        }
+
+        let finalTurns = totalTurnsRef.current || turnCountRef.current || 0;
+        if (!totalTurnsRef.current) {
+          totalTurnsRef.current = finalTurns;
+          setTotalTurns(finalTurns);
+        }
 
         if (finalWinner === 'player') {
-          registerHighscore(turnCountRef.current);
+          registerHighscore(finalTurns);
         }
       } else if (gameStateRef.current !== 'game_over') {
         setErrorMessage("Disconnected from operational grid. The connection to the Battleship RL server was closed.");
