@@ -45,6 +45,21 @@ const getSunkShipsFromBoard = (board: string[][] | null): Set<string> => {
   return sunk;
 };
 
+const getHitsFromBoard = (board: string[][] | null): number => {
+  if (!board) return 0;
+  let hits = 0;
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      const cellData = board[r][c] || 'NONE:EMPTY';
+      const [, state] = cellData.split(':');
+      if (state === 'HIT') {
+        hits++;
+      }
+    }
+  }
+  return hits;
+};
+
 export default function Home() {
   // Game state
   const [gameState, setGameState] = useState<'setup' | 'placement' | 'active' | 'game_over'>('setup');
@@ -714,6 +729,19 @@ export default function Home() {
     a: new Set([...Array.from(sunkShips.a), ...Array.from(derivedEnemySunk)]),
   };
 
+  const playerHits = getHitsFromBoard(enemyBoard);
+  const agentHits = getHitsFromBoard(yourBoard);
+
+  const effectivePlayerScore = {
+    sunk: playerScore.sunk,
+    hit: playerHits,
+  };
+
+  const effectiveAgentScore = {
+    sunk: agentScore.sunk,
+    hit: agentHits,
+  };
+
   return (
     <div className={`${styles.container} ${isShaking ? 'shake' : ''}`}>
       {/* Title Header */}
@@ -785,8 +813,8 @@ export default function Home() {
               <div className={styles.boardWrapper}>
                 <h3 className={styles.boardTitle}>Your Board</h3>
                 <div className={styles.statsBox}>
-                  Ships Sunk: <span>{agentScore.sunk} / 5</span>
-                  Hits: <span>{agentScore.hit}</span>
+                  Ships Sunk: <span>{effectiveAgentScore.sunk} / 5</span>
+                  Hits: <span>{effectiveAgentScore.hit}</span>
                 </div>
                 <GameBoard
                   board={yourBoard}
@@ -803,8 +831,8 @@ export default function Home() {
               <div className={styles.boardWrapper}>
                 <h3 className={styles.boardTitle}>Enemy Board</h3>
                 <div className={styles.statsBox}>
-                  Ships Sunk: <span>{playerScore.sunk} / 5</span>
-                  Hits: <span>{playerScore.hit}</span>
+                  Ships Sunk: <span>{effectivePlayerScore.sunk} / 5</span>
+                  Hits: <span>{effectivePlayerScore.hit}</span>
                 </div>
                 <GameBoard
                   board={enemyBoard}
@@ -829,8 +857,8 @@ export default function Home() {
             )}
 
             <StatsPanel
-              playerScore={playerScore}
-              agentScore={agentScore}
+              playerScore={effectivePlayerScore}
+              agentScore={effectiveAgentScore}
               sunkShips={mergedSunkShips}
             />
 
@@ -876,8 +904,8 @@ export default function Home() {
                 <p style={{ marginBottom: '0.5rem' }}><strong>Game Report:</strong></p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', textAlign: 'left' }}>
                   <div>Total Turns:</div><div style={{ textAlign: 'right', fontWeight: 'bold' }}>{totalTurns}</div>
-                  <div>Your Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--navy-primary)' }}>{playerScore.hit}</div>
-                  <div>AI Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--state-hit)' }}>{agentScore.hit}</div>
+                  <div>Your Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--navy-primary)' }}>{effectivePlayerScore.hit}</div>
+                  <div>AI Hits Fired:</div><div style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--state-hit)' }}>{effectiveAgentScore.hit}</div>
                 </div>
               </div>
             </div>
