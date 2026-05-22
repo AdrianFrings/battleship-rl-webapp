@@ -38,20 +38,36 @@ export default function SetupStage({ onStart, isLoading }: SetupStageProps) {
 
   // Load highscores on mount
   useEffect(() => {
-    const fetchLeaderboard = async () => {
+    const loadLeaderboard = async () => {
+      // 1. Try to fetch from database API
       try {
         const response = await fetch('/api/leaderboard');
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.records) {
+          if (data.success && data.records && data.records.length > 0) {
             setLeaderboard(data.records.slice(0, 5)); // Keep top 5
+            return; // Successfully loaded from database!
           }
         }
       } catch (e) {
-        console.error('Failed to load highscores from API', e);
+        console.error('Failed to load highscores from API, falling back to localStorage:', e);
+      }
+
+      // 2. Fall back to localStorage if database is empty/inactive or API fails
+      try {
+        const stored = localStorage.getItem('battleship_highscores');
+        if (stored) {
+          const parsed = JSON.parse(stored) as Highscore[];
+          // Sort ascending by turns
+          parsed.sort((a, b) => a.turns - b.turns);
+          setLeaderboard(parsed.slice(0, 5)); // Keep top 5
+        }
+      } catch (e) {
+        console.error('Failed to load highscores from localStorage', e);
       }
     };
-    fetchLeaderboard();
+
+    loadLeaderboard();
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

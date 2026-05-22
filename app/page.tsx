@@ -149,6 +149,7 @@ export default function Home() {
   };
 
   const registerHighscore = async (turns: number) => {
+    // 1. Submit to serverless API database
     try {
       const response = await fetch('/api/leaderboard', {
         method: 'POST',
@@ -165,6 +166,35 @@ export default function Home() {
       }
     } catch (e) {
       console.error("Failed to register combat record highscore via API", e);
+    }
+
+    // 2. Save locally in localStorage as a persistent offline fallback
+    try {
+      const key = 'battleship_highscores';
+      const stored = localStorage.getItem(key);
+      const records = stored ? JSON.parse(stored) : [];
+
+      // Check if this record already exists (avoid duplicates in case both callbacks fire)
+      const isDuplicate = records.some((r: any) =>
+        r.name === (nicknameRef.current || 'Commander') &&
+        r.turns === turns &&
+        r.agent === (opponentAgentRef.current || 'q-agent') &&
+        Math.abs(new Date(r.date).getTime() - new Date().getTime()) < 5000 // within 5 seconds
+      );
+      if (isDuplicate) return;
+
+      records.push({
+        name: nicknameRef.current || 'Commander',
+        turns: turns,
+        agent: opponentAgentRef.current || 'q-agent',
+        date: new Date().toLocaleDateString(),
+      });
+      // Sort ascending by turns (fewer turns is better)
+      records.sort((a: any, b: any) => a.turns - b.turns);
+      // Save only top 25 records
+      localStorage.setItem(key, JSON.stringify(records.slice(0, 25)));
+    } catch (e) {
+      console.error("Failed to register local combat record highscore", e);
     }
   };
 
