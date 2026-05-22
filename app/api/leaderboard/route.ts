@@ -1,23 +1,34 @@
 import { NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export const dynamic = 'force-dynamic';
 
-// Simple in-memory fallback for local development if KV is not configured
+// Simple in-memory fallback for local development if Redis/KV is not configured
 let localLeaderboardFallback: any[] = [];
 
-const isKvConfigured = () => {
-  return !!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN;
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+
+const isRedisConfigured = () => {
+  return !!redisUrl && !!redisToken;
 };
+
+// Initialize the Redis client only if configured
+const redis = isRedisConfigured()
+  ? new Redis({
+      url: redisUrl as string,
+      token: redisToken as string,
+    })
+  : null;
 
 export async function GET() {
   try {
-    if (!isKvConfigured()) {
-      console.warn("Vercel KV is not configured. Falling back to in-memory leaderboard.");
+    if (!isRedisConfigured() || !redis) {
+      console.warn("Upstash Redis / Vercel KV is not configured. Falling back to in-memory leaderboard.");
       return NextResponse.json({ success: true, records: localLeaderboardFallback.slice(0, 25) });
     }
 
-    const rawList = await kv.zrange('battleship_leaderboard', 0, 24);
+    const rawList = await redis.zrange('battleship_leaderboard', 0, 24);
     const records = rawList.map((item: any) => {
       try {
         return typeof item === 'string' ? JSON.parse(item) : item;
@@ -51,23 +62,23 @@ export async function POST(request: Request) {
       date: new Date().toLocaleDateString(),
     };
 
-    if (!isKvConfigured()) {
-      console.warn("Vercel KV is not configured. Storing highscore in-memory.");
+    if (!isRedisConfigured() || !redis) {
+      console.warn("Upstash Redis / Vercel KV is not configured. Storing highscore in-memory.");
       localLeaderboardFallback.push(newRecord);
       localLeaderboardFallback.sort((a, b) => a.turns - b.turns);
       localLeaderboardFallback = localLeaderboardFallback.slice(0, 100);
       return NextResponse.json({ success: true, record: newRecord });
     }
 
-    await kv.zadd('battleship_leaderboard', {
+    await redis.zadd('battleship_leaderboard', {
       score: turns,
       member: JSON.stringify(newRecord),
     });
 
     // Cap the leaderboard to top 100 entries to save space/requests
-    const totalCount = await kv.zcard('battleship_leaderboard');
+    const totalCount = await redis.zcard('battleship_leaderboard');
     if (totalCount > 100) {
-      await kv.zremrangebyrank('battleship_leaderboard', 100, -1);
+      await redis.zremrangebyrank('battleship_leaderboard', 100, -1);
     }
 
     return NextResponse.json({ success: true, record: newRecord });
